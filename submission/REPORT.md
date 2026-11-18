@@ -70,17 +70,24 @@ Lấy từ `02_error_list_v1.csv` (211 dòng trên 149 ảnh; mẫu số: 224 �
 - `raw`: toàn bộ 224 ảnh `data/raw` với nhãn gốc, gồm cả 2 ảnh hỏng, 12 ảnh trùng, 5 ảnh rò rỉ test và mọi dòng nhãn lỗi;
 - `clean`: 202 ảnh theo `submission/export/clean_v1/manifest.json` (export nháp, quyết định Hold).
 
-**Kết quả:** ⏳ *[ĐIỀN SAU KHI TRAIN: dán bảng từ `submission/results/comparison.md` (mAP50, mAP50-95, precision, recall, TB ± độ lệch chuẩn) và số ảnh train thực tế của mỗi biến thể]*
+**Kết quả** (`submission/results/comparison.md`, sinh bởi `scripts/summarize_results.py`; TB ± độ lệch chuẩn mẫu của 2 seed; yolo26n, 20 epoch, seed 0 và 1):
 
-**So với nhiễu:** ⏳ *[ĐIỀN SAU KHI TRAIN: chênh mAP50 (clean − raw) = … so với độ lệch chuẩn giữa 2 seed = …. Nếu |chênh| ≤ khoảng 2 lần độ lệch chuẩn thì viết "**chưa kết luận được** clean tốt hơn raw"; chỉ khi chênh lệch vượt rõ nhiễu ở cả 2 seed mới được nói một biến thể tốt hơn.]*
+| biến thể | #ảnh train | số seed | map50 (TB ± độ lệch) | map50_95 (TB ± độ lệch) | precision (TB ± độ lệch) | recall (TB ± độ lệch) |
+|---|---|---|---|---|---|---|
+| raw | 224 | 2 | 0.726 ± 0.000 | 0.512 ± 0.004 | 0.764 ± 0.061 | 0.649 ± 0.028 |
+| clean | 202 | 2 | 0.701 ± 0.025 | 0.487 ± 0.008 | 0.759 ± 0.003 | 0.625 ± 0.019 |
 
-**Giả thuyết giải thích và cách kiểm** (đặt ra trước khi xem kết quả):
-1. **Rò rỉ test thổi phồng `raw`.** `raw` chứa 5 ảnh trùng tập test (`img_0049`↔`test_033`, `img_0101`↔`test_039`, `img_0167`↔`test_044`, `img_0174`↔`test_085`, `img_0221`↔`test_009`). Model `raw` đã "thấy" 5/100 ảnh test. Cách kiểm: đánh giá lại hai model trên 95 ảnh test còn lại, hoặc so AP của 5 ảnh đó giữa hai biến thể.
-2. **`clean` vẫn còn nhãn máy chưa ai xem.** 45 ảnh ngoài ngân sách giữ nguyên nhãn máy; 38 ảnh còn cảnh báo (16 LOOSE_BOX, 11 FALSE_POS…). Lợi ích của `clean` vì vậy bị giới hạn. Cách kiểm: thêm biến thể `oracle` (cùng ảnh với clean, nhãn người) làm chặn trên.
-3. **Nhiễu thống kê lớn.** Test chỉ có 100 ảnh, mỗi biến thể chỉ 2 seed; lớp truck (41 box) và bus (32 box) có rất ít box so với person (574) theo `class_stats.csv`, nên AP theo lớp dao động mạnh. Cách kiểm: xem `ap50_per_class` trong `results/*.json`, và thêm seed nếu còn quota.
-4. **Ultralytics tự bỏ dữ liệu hỏng của `raw`.** Ảnh không mở được và dòng có id lạ bị cảnh báo và bỏ qua khi train, nên `raw` thực chất không bẩn bằng con số 224 ảnh. Cách kiểm: đọc log cảnh báo ở ô train của notebook và trường `train_images` trong json.
+Từng seed (`results/*_seed*.json`): mAP50 raw = 0.7256 / 0.7259, clean = 0.7180 / 0.6832; mAP50-95 raw = 0.5144 / 0.5090, clean = 0.4933 / 0.4815. Kết quả `clean` khớp đúng export hiện tại (`manifest_sha1 = 85d9375…`, `config_sha1 = 58d1755…`, `train_images = 202 = manifest.n_images`).
 
-**Kết luận và việc tiếp theo:** ⏳ *[ĐIỀN SAU KHI TRAIN: kết luận trung thực theo bảng trên, và việc tiếp theo (thêm seed, bỏ 5 ảnh rò rỉ khỏi đánh giá, chạy `oracle`).]*
+**So với nhiễu:** chênh mAP50 (clean − raw) = **−0.025**, đúng bằng độ lệch chuẩn giữa 2 seed của `clean` (0.025). Seed 0 của clean (0.718) chỉ kém raw 0.008, còn seed 1 kém 0.043, nên **chênh mAP50 nằm trong nhiễu giữa các seed**. mAP50-95 chênh −0.025, lớn hơn độ lệch chuẩn (0.004–0.008), và cả 2 seed clean đều thấp hơn cả 2 seed raw. Nhưng với chỉ 2 seed, độ lệch chuẩn ước lượng rất không chắc chắn: raw có mAP50 ± 0.000 chỉ vì hai seed tình cờ gần nhau. Theo lớp (AP50 trung bình 2 seed): car 0.738 vs 0.738, person 0.823 vs 0.822, bus 0.703 (clean) vs 0.695 (raw), **truck 0.538 (clean) vs 0.648 (raw)**. Gần như toàn bộ khoảng chênh đến từ lớp truck, và chính truck của clean dao động rất mạnh giữa 2 seed (0.590 vs 0.486).
+
+**Giả thuyết giải thích và cách kiểm** (đặt ra trước khi xem kết quả; bổ sung điều số liệu cho thấy):
+1. **Rò rỉ test thổi phồng `raw`.** `raw` chứa 5 ảnh trùng tập test (`img_0049`↔`test_033`, `img_0101`↔`test_039`, `img_0167`↔`test_044`, `img_0174`↔`test_085`, `img_0221`↔`test_009`), tức model `raw` đã "thấy" 5/100 ảnh test, có 22 vật (10 car, 11 person, 1 truck) trong số khoảng 390 box của test. Điều này thiên vị có lợi cho raw, nên phép so sánh hiện tại **không công bằng với clean**. Cách kiểm: đánh giá lại hai model trên 95 ảnh test còn lại.
+2. **`clean` vẫn còn nhãn máy chưa ai xem.** 45 ảnh ngoài ngân sách giữ nguyên nhãn máy; 38 ảnh còn cảnh báo (16 LOOSE_BOX, 11 FALSE_POS…). Lợi ích của `clean` vì vậy bị giới hạn. Cách kiểm: thêm biến thể `oracle` (cùng ảnh với clean, nhãn người) làm chặn trên. Nếu `oracle` cũng không hơn `raw` thì vấn đề nằm ở thiết kế đánh giá chứ không phải ở chất lượng nhãn.
+3. **Nhiễu thống kê lớn, nhất là lớp truck.** Test chỉ có 100 ảnh, mỗi biến thể chỉ 2 seed. Lớp truck chỉ có 41 box trong `clean` (`class_stats.csv`) và 24 box trên 16 ảnh test, nên vài phát hiện đúng hay sai cũng làm AP truck đổi khoảng 0.1, đúng mức dao động giữa 2 seed của clean. Cách kiểm: chạy thêm seed (≥ 5), xem khoảng chênh truck có còn không.
+4. **Ultralytics tự bỏ dữ liệu hỏng của `raw`.** `train_images = 224` chỉ là số file ảnh trong thư mục. Khi nạp dữ liệu, Ultralytics đánh dấu "corrupt" và **bỏ cả ảnh** nếu ảnh không mở được hoặc file nhãn có id ngoài 0..3, giá trị âm hay `nan`. Như vậy các lỗi cú pháp nặng nhất của raw không vào train, mà chỉ làm raw mất vài ảnh, nên raw "sạch" hơn con số 224 gợi ý. Trong khi đó clean ít hơn 22 ảnh, chủ yếu là ảnh trùng hoặc rò rỉ vốn không thêm thông tin mới. Cách kiểm: đọc dòng cảnh báo "ignoring corrupt image/label" ở ô train (ô 6) của notebook để biết raw thực sự dùng bao nhiêu ảnh.
+
+**Kết luận và việc tiếp theo:** **Không kết luận được rằng `clean` tốt hơn `raw`.** Trên tập test này, `clean` không tốt hơn: mAP50 kém 0.025, nằm trong nhiễu giữa các seed; mAP50-95 kém 0.025 ở cả 2 seed, nhưng 2 seed là quá ít để khẳng định `clean` tệ hơn. Ngoài ra, phép so sánh còn thiên vị `raw` vì 5 ảnh rò rỉ test (giả thuyết 1). Việc tiếp theo, theo thứ tự: (1) đánh giá lại trên 95 ảnh test không bị rò rỉ; (2) thêm seed (≥ 5) cho cả hai biến thể; (3) chạy `oracle` làm chặn trên; (4) xem lại các ảnh truck trong 45 ảnh chưa duyệt (nhầm car/truck là loại lỗi chính của raw, §4 điểm mù 3).
 
 ## 6. Quyết định và ghi chú AI
 **(a) Quyết định cuối: HOLD**, không phát hành `clean_v1`. Số liệu khớp với `08_summary.json` và `07_error_list_v3`: 0 lỗi bắt buộc, 38/202 = 18.8% ảnh còn cảnh báo chưa duyệt ≥ 10%.
